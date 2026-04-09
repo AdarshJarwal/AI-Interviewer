@@ -1,6 +1,4 @@
-Here is a complete, professional `README.md` file tailored specifically to your AI Interviewer project. 
 
-```markdown
 # 🎙️ AI Technical Interviewer
 
 A fully interactive, voice-enabled AI Mock Interview application built with Streamlit and LangChain. This tool simulates a realistic technical interview environment by listening to your spoken answers, evaluating them in real-time using large language models, and asking dynamic follow-up questions based on your performance and resume.
