@@ -26,14 +26,13 @@ Before you begin, ensure you have Python 3.9+ installed. You will also need API 
 * [Google Gemini API Key](https://aistudio.google.com/)
 * [Groq API Key](https://console.groq.com/)
 * [Anthropic API Key](https://console.anthropic.com/) *(Optional, based on your active model)*
-* [Tavily API Key](https://tavily.com/) *(Optional, for web search agent tools)*
 
 ## 🚀 Installation & Setup
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/yourusername/ai-interviewer-app.git](https://github.com/yourusername/ai-interviewer-app.git)
-cd ai-interviewer-app
+git clone [https://github.com/AdarshJarwal/AI-Interviewer-app.git](https://github.com/AdarshJarwal/AI-Interviewer-app.git)
+cd AI-Interviewer-app
 ```
 
 **2. Create a virtual environment**
