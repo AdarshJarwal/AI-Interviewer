@@ -1,0 +1,26 @@
+streamlit~=1.56.0
+python-dotenv~=1.2.2
+gTTS~=2.5.4
+groq~=0.37.1
+langchain~=1.2.13
+langgraph~=1.1.3
+# Web Framework
+streamlit
+
+# Environment Variables
+python-dotenv
+
+# Text-to-Speech & Audio
+gTTS
+groq
+
+# LangChain & LangGraph Ecosystem
+langchain
+langchain-core
+langgraph
+langgraph-checkpoint-sqlite
+
+# LangChain Model Providers
+langchain-google-genai
+langchain-groq
+langchain-anthropic
