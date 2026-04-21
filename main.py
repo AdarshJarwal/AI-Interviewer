@@ -52,7 +52,7 @@ def run_timer(seconds, message, container):
         container.empty()
 
 
-def get_interview_agent(topic, difficulty, ques, resume= None):
+def get_interview_agent(topic, difficulty, ques, resume= None, model):
     sys_prompt = f"""
     You are a strict but fair professional technical interviewer specializing in {topic}.
     CRITICAL RULES FOR EVERY RESPONSE:
@@ -68,7 +68,7 @@ def get_interview_agent(topic, difficulty, ques, resume= None):
     6. Evaluate on conceptual clarity, not memorization.
     """
     return create_agent(
-        model1,
+        model = model,
         tools=[],
         checkpointer=checkpointer,
         system_prompt=sys_prompt
@@ -140,9 +140,11 @@ with st.sidebar:
     diff_input = st.selectbox("Difficulty Level", ["Easy", "Medium", "Hard"], index=1)
     num_que_input = st.number_input("Number of Questions", min_value=3, max_value=20, value=5)
     resume_file = st.file_uploader("Upload your resume (pdf only)", type=["pdf"])
+    model = st.selectbox("Only change if current server isn't working",["model1", "model2", 'model3'], index= 1)
     if st.button("Reset Session", type="secondary"):
         st.session_state.clear()
         st.rerun()
+
 
 st.title("🎙️ AI Technical Interviewer")
 
@@ -194,7 +196,7 @@ elif st.session_state.interview_state == "intro":
         # Generate first question
         with st.spinner("Generating your first question..."):
             agent = get_interview_agent(st.session_state.topic, st.session_state.difficulty, st.session_state.num_que,
-                                        resume= resume_file)
+                                        resume= resume_file,model=model)
             res = agent.invoke(
                 {'messages': [HumanMessage(content=f"{user_intro}. I am ready for the first question.")]},
                 config=st.session_state.config
