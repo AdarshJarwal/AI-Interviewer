@@ -4,6 +4,7 @@ import time
 import uuid
 import base64
 import sqlite3
+import PyPDF2
 import streamlit as st
 from dotenv import load_dotenv
 from gtts import gTTS
@@ -13,6 +14,8 @@ from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
 
 # --- 1. ENVIRONMENT & BACKEND SETUP ---
 load_dotenv()
@@ -30,6 +33,8 @@ model2 = init_chat_model("groq:qwen/qwen3-32b")
 # Anthropic Model
 model3 = init_chat_model("anthropic:claude-sonnet-4")
 
+models = {"Model1":model1,"Model2":model2,"Model3":model3 }
+
 
 # Helper function to clean AI output
 def clean_output(text):
@@ -37,9 +42,32 @@ def clean_output(text):
 
 
 # Initialize Database Checkpointer
-conn = sqlite3.connect("AI_interviewer_history.db", check_same_thread=False)
+# conn = sqlite3.connect("AI_interviewer_history.db", check_same_thread=False)
+# checkpointer = SqliteSaver(conn)
+@st.cache_resource
+def get_db_connection():
+    return sqlite3.connect("AI_interviewer_history.db", check_same_thread=False)
+
+
+conn = get_db_connection()
 checkpointer = SqliteSaver(conn)
 
+
+# resume pdf parsing
+def extract_text_from_pdf(uploaded_file):
+    """Extracts text from a Streamlit uploaded PDF file."""
+    if uploaded_file is not None:
+        try:
+            pdf_reader = PyPDF2.PdfReader(uploaded_file)
+            text = ""
+            for page in pdf_reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+            return text.strip()
+        except Exception as e:
+            return f"[Error extracting resume text: {e}]"
+    return None
 
 
 def run_timer(seconds, message, container):
@@ -52,7 +80,12 @@ def run_timer(seconds, message, container):
         container.empty()
 
 
-def get_interview_agent(topic, difficulty, ques, resume= None, model):
+def get_interview_agent(topic, difficulty, ques, resume_text= None, model=model2):
+    if resume_text:
+        resume_instruction = f"4. Tailor some of your questions to the candidate's resume:\n{resume_text}"
+    else:
+        resume_instruction = "4. (No resume provided, ask general questions based on the topic)."
+
     sys_prompt = f"""
     You are a strict but fair professional technical interviewer specializing in {topic}.
     CRITICAL RULES FOR EVERY RESPONSE:
@@ -62,13 +95,13 @@ def get_interview_agent(topic, difficulty, ques, resume= None, model):
     3. Format your response EXACTLY like this:
        **Feedback:** [1-2 sentences briefly evaluating their answer, dont say the word feedback]\n\n
        **Next Question:** [Ask exactly ONE new {difficulty}-difficulty technical question]
-    4. You can also ask questions from the resume ({resume})
+    {resume_instruction}
     4. Do NOT break character. Just provide the feedback, score, and immediately ask the next question.
     5. Ask questions an average student can answer in 90 sec of speech.
     6. Evaluate on conceptual clarity, not memorization.
     """
     return create_agent(
-        model = model,
+        model = selected_model,
         tools=[],
         checkpointer=checkpointer,
         system_prompt=sys_prompt
@@ -109,7 +142,7 @@ def transcribe_audio_groq(audio_bytes):
                 response_format="text",
                 language="en"
             )
-        return transcription
+        return transcription.text
     except Exception as e:
         return f"[Error transcribing audio: {str(e)}]"
 
@@ -140,7 +173,9 @@ with st.sidebar:
     diff_input = st.selectbox("Difficulty Level", ["Easy", "Medium", "Hard"], index=1)
     num_que_input = st.number_input("Number of Questions", min_value=3, max_value=20, value=5)
     resume_file = st.file_uploader("Upload your resume (pdf only)", type=["pdf"])
-    model = st.selectbox("Only change if current server isn't working",["model1", "model2", 'model3'], index= 1)
+    model = st.selectbox("Only change if current server isn't working",["Model1", "Model2", 'Model3'], index= 1)
+    selected_model = models[model]
+
     if st.button("Reset Session", type="secondary"):
         st.session_state.clear()
         st.rerun()
@@ -166,6 +201,8 @@ if st.session_state.interview_state == "setup":
         st.session_state.topic = topic_input
         st.session_state.difficulty = diff_input.lower()
         st.session_state.num_que = num_que_input
+        st.session_state.resume_text = extract_text_from_pdf(resume_file)
+
         st.session_state.interview_state = "intro"
         st.rerun()
 
@@ -195,8 +232,11 @@ elif st.session_state.interview_state == "intro":
 
         # Generate first question
         with st.spinner("Generating your first question..."):
-            agent = get_interview_agent(st.session_state.topic, st.session_state.difficulty, st.session_state.num_que,
-                                        resume= resume_file,model=model)
+            agent = get_interview_agent(st.session_state.topic,
+                                        st.session_state.difficulty,
+                                        st.session_state.num_que,
+                                        resume_text = st.session_state.get("resume_text"),
+                                        model=selected_model)
             res = agent.invoke(
                 {'messages': [HumanMessage(content=f"{user_intro}. I am ready for the first question.")]},
                 config=st.session_state.config
@@ -247,7 +287,13 @@ elif st.session_state.interview_state == "interviewing":
 
             # Get AI Evaluation & Next Question
             with st.spinner("Evaluating and formulating next question..."):
-                agent = get_interview_agent(st.session_state.topic, st.session_state.difficulty)
+                agent = get_interview_agent(
+                    st.session_state.topic,
+                    st.session_state.difficulty,
+                    st.session_state.num_que,
+                    resume_text=st.session_state.get("resume_text"),
+                    model=selected_model
+                )
                 response = agent.invoke(
                     {"messages": [HumanMessage(content=user_ans)]},
                     config=st.session_state.config
@@ -278,7 +324,13 @@ elif st.session_state.interview_state == "report":
         - Weaknesses
         - Improvement Tips
         """
-        agent = get_interview_agent(st.session_state.topic, st.session_state.difficulty)
+        agent = get_interview_agent(
+            st.session_state.topic,
+            st.session_state.difficulty,
+            st.session_state.num_que,
+            resume_text=st.session_state.get("resume_text"),
+            model=selected_model
+        )
         report_res = agent.invoke(
             {"messages": [HumanMessage(content=report_prompt)]},
             config=st.session_state.config
