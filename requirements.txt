@@ -24,3 +24,6 @@ langgraph-checkpoint-sqlite
 langchain-google-genai
 langchain-groq
 langchain-anthropic
+
+#Resume Pdf parsing
+PyPDF2~=3.0.1
