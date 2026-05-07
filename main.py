@@ -9,13 +9,14 @@ import streamlit as st
 from dotenv import load_dotenv
 from gtts import gTTS
 from groq import Groq
+import streamlit.components.v1 as components
 
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
-# from langchain.agents import create_agent
-# from langchain_core.messages import HumanMessage
-# from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
 
 # --- 1. ENVIRONMENT & BACKEND SETUP ---
 load_dotenv()
@@ -110,22 +111,32 @@ def get_interview_agent(topic, difficulty, ques, resume_text= None, model=model2
 
 # --- 2. AUDIO UTILITIES ---
 
+
+
+
 def output_audio_from_text(text_to_speak):
-    """Converts text to speech and autoplays it."""
-    audio_filename = "temp_output.mp3"
-    tts = gTTS(text=text_to_speak, lang='en', slow=False)
-    tts.save(audio_filename)
+    """Plays audio instantly using the browser's built-in Text-to-Speech."""
+    # Clean the text to prevent JavaScript syntax errors
+    safe_text = text_to_speak.replace('"', "'").replace('\n', ' ').replace('\r', '')
 
-    with open(audio_filename, "rb") as f:
-        data = f.read()
-        b64 = base64.b64encode(data).decode()
+    js_code = f"""
+    <script>
+        // Stop any currently playing audio so they don't overlap
+        window.speechSynthesis.cancel();
 
-    html_audio = f"""
-        <audio autoplay="true" style="display:none;">
-        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
+        // Create the new speech request
+        const msg = new SpeechSynthesisUtterance("{safe_text}");
+        msg.lang = 'en-US'; 
+        msg.rate = 1.0; // Speed (1.0 is normal, 1.2 is slightly faster)
+        msg.pitch = 1.0;
+
+        // Play the audio
+        window.speechSynthesis.speak(msg);
+    </script>
     """
-    st.markdown(html_audio, unsafe_allow_html=True)
+
+    # Inject the JavaScript silently into the Streamlit app
+    components.html(js_code, height=0, width=0)
 
 
 
@@ -142,7 +153,7 @@ def transcribe_audio_groq(audio_bytes):
                 response_format="text",
                 language="en"
             )
-        return transcription.text
+        return transcription
     except Exception as e:
         return f"[Error transcribing audio: {str(e)}]"
 
