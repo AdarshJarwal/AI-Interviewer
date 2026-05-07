@@ -116,28 +116,30 @@ def get_interview_agent(topic, difficulty, ques, resume_text= None, model=model2
 
 def output_audio_from_text(text_to_speak):
     """Plays audio instantly using the browser's built-in Text-to-Speech."""
-    # Clean the text to prevent JavaScript syntax errors
-    safe_text = text_to_speak.replace('"', "'").replace('\n', ' ').replace('\r', '')
-
+    
+    # 1. Strip out markdown symbols (*, _, #, `) so the voice ignores them
+    clean_speech = re.sub(r'[*_#`]', '', text_to_speak)
+    
+    # 2. Clean the text to prevent JavaScript syntax errors
+    safe_text = clean_speech.replace('"', "'").replace('\n', ' ').replace('\r', '')
+    
     js_code = f"""
     <script>
         // Stop any currently playing audio so they don't overlap
         window.speechSynthesis.cancel();
-
+        
         // Create the new speech request
         const msg = new SpeechSynthesisUtterance("{safe_text}");
         msg.lang = 'en-US'; 
-        msg.rate = 1.0; // Speed (1.0 is normal, 1.2 is slightly faster)
+        msg.rate = 1.0; 
         msg.pitch = 1.0;
-
+        
         // Play the audio
         window.speechSynthesis.speak(msg);
     </script>
     """
-
-    # Inject the JavaScript silently into the Streamlit app
+    
     components.html(js_code, height=0, width=0)
-
 
 
 def transcribe_audio_groq(audio_bytes):
